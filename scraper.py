@@ -11,6 +11,9 @@ from selenium.webdriver.common.keys import Keys
 import google.generativeai as genai
 from datetime import datetime
 import re
+import requests
+from dotenv import load_dotenv
+import os
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,6 +21,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import urllib3
 # Disable the specific InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+load_dotenv()
 
 # Configure logging and API
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +35,9 @@ SEARCH_QUERY = "upcoming hackathons"
 MAX_RESULTS = 50
 DELAY = 0.2  # Seconds between requests
 EXCLUDED_SITES = ["devpost", "devfolio", "unstop", "hackerrank","hackerearth"]
+CUSTOM_SEARCH_URL = 'https://www.googleapis.com/customsearch/v1'
+CUSTOM_SEARCH_API_KEY = os.getenv('GOOGLE_API_KEY')
+CUSTOM_SEARCH_ID = os.getenv('SEARCH_ENGINE_ID')
 # EXCLUDED_SITES = []
 
 class WebScraper:
@@ -42,7 +49,7 @@ class WebScraper:
     def google_search(self, max_results = MAX_RESULTS):
         """URLs from multiple Google search results pages."""
         driver = webdriver.Chrome(options=self.options)
-        driver.get("https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/&ec=GAZAmgQ")
+        '''driver.get("https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/&ec=GAZAmgQ")
          
         email_field = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "identifierId"))
@@ -61,7 +68,7 @@ class WebScraper:
 
         time.sleep(10) 
 
-        driver.implicitly_wait(100)
+        driver.implicitly_wait(100)'''
         links = []
         page_number = 0
         results_per_page = 10  # Google search returns 10 results per page by default
@@ -73,13 +80,27 @@ class WebScraper:
                 search_url = f"https://www.google.com/search?q={SEARCH_QUERY}&start={start_param}"
                 logger.info(f"Scraping page {page_number + 1}: {search_url}")
                 
-                driver.get(search_url)
-                time.sleep(2)  # Delay to mimic human behavior
+                #driver.get(search_url)
+                #time.sleep(2)  # Delay to mimic human behavior
+
+                params = {
+                    'q': SEARCH_QUERY,
+                    'key': CUSTOM_SEARCH_API_KEY,
+                    'cx': CUSTOM_SEARCH_ID,
+                    'cr': 'countryIN',
+                    'start': start_param,
+                }
+
+                results = requests.get(CUSTOM_SEARCH_URL, params=params)
+                for item in results.json()['items']:
+                    print(item['title'])
+                #quit()
+                results = results.json()['items']
                 
                 # Find all search result links
-                results = driver.find_elements(By.TAG_NAME, "a")
+                #results = driver.find_elements(By.TAG_NAME, "a")
                 for result in results:
-                    href = result.get_attribute("href")
+                    href = result["link"]
                     # Filter out None, non-http links, and excluded sites
                     if href and href.startswith('http') and not 'google' in href:
                         if not any(excluded in href for excluded in EXCLUDED_SITES):
@@ -266,7 +287,7 @@ class WebScraper:
         search_query = f"{name} details"
         logger.info(f"Searching additional details for: {name}")
     
-        driver = webdriver.Chrome(options=self.options)
+        '''driver = webdriver.Chrome(options=self.options)
         driver.get("https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/&ec=GAZAmgQ")
          
         email_field = WebDriverWait(driver, 10).until(
@@ -282,12 +303,12 @@ class WebScraper:
             )
             password_field.send_keys("temp@1234",Keys.ENTER)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error: {e}")'''
 
         additional_info = {"link": None, "description": None}
         
         try:
-            # Step 1: Perform Google search
+            '''# Step 1: Perform Google search
             driver.get("https://www.google.com")
             search_box = driver.find_element(By.NAME, "q")
             search_box.send_keys(search_query + Keys.RETURN)
@@ -295,10 +316,23 @@ class WebScraper:
             
             # Step 2: Collect and scrape content from the first few search result links
             results = driver.find_elements(By.TAG_NAME, "a")
-            candidate_contents = []
+            candidate_contents = []'''
+            params = {
+                    'q': search_query,
+                    'key': CUSTOM_SEARCH_API_KEY,
+                    'cx': CUSTOM_SEARCH_ID,
+                    'cr': 'countryIN',
+                    'start': 1,
+                }
+
+            results = requests.get(CUSTOM_SEARCH_URL, params=params)
+            for item in results.json()['items']:
+                print(item['title'])
+            #quit()
+            results = results.json()['items']
             
             for result in results[:3]:  # Check the top 3 websites
-                href = result.get_attribute("href")
+                href = result['link']
                 if href and href.startswith('http') and not 'google' in href:
                     logger.info(f"Scraping {href} for details...")
                     page_content = self.scrape_page(href)
@@ -339,8 +373,6 @@ class WebScraper:
                     logger.error(f"LLM processing error for {name}: {e}")
         except Exception as e:
             logger.error(f"Error searching additional info for {name}: {e}")
-        finally:
-            driver.quit()
     
         return additional_info
 
