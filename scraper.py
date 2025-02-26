@@ -127,7 +127,7 @@ class WebScraper:
     def scrape_page(self,url):
             """Scrape webpage content using Selenium and BeautifulSoup to extract both text and links."""
             driver = webdriver.Chrome(options=self.options)
-            content = {"text": None, "links": []}
+            content = {"text": None, "links": [], "image_links" : []}
             
             try:
                 driver.get(url)
@@ -141,6 +141,10 @@ class WebScraper:
                 lines = (line.strip() for line in text.splitlines())
                 content["text"] = ' '.join(line for line in lines if line)
                 
+                # Extract image src links
+                image_srcs = [img['src'] for img in soup.find_all('img') if 'src' in img.attrs]
+                content["image_links"] = image_srcs
+
                 # Extract all links that start with http
                 for a_tag in soup.find_all('a', href=True):
                     href = a_tag['href']
@@ -203,13 +207,15 @@ class WebScraper:
             "type": remote or onsite
             "category": AI,Web3,Software Development
             "prize pool": list prizes(can be cash prize or intrnship offer of job offer etc.)
+            "image sources": return a list of urls keep same as image_links DO NOT CHANGE.
         
         Important guidelines:
         1. Keep the date in its original format - DO NOT try to parse or modify date ranges
         2. Only include events that are upcoming (i.e., events happening after {today_date.strftime('%d-%m-%Y')})
         3. Ensure that the event is a hackathon. Do not classify other types of events
         4. If any of the details are unclear, mark them as null
-        5. Return the response in this exact format:
+        5. If the image_links in the json file provided is not null return it WITHOUT CHANGING.
+        6. Return the response in this exact format:
         [
             {{
                 "is_hackathon": true,
@@ -220,6 +226,7 @@ class WebScraper:
                 "type": Remote,
                 "category":AI,
                 "prize pool": $10000,
+                "image sources": ["https://image-source1.png","https://image-source2.png"]
             }}
         ]
     
