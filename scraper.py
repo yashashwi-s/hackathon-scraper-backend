@@ -23,12 +23,6 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv()
 
-# Configure logging and API
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-genai.configure(api_key="AIzaSyA9yxJEpAaQ1UiWa8QJT5YoJAq6QyJE1Wg")
-model = genai.GenerativeModel("gemini-1.5-flash")
-
 # Constants
 OUTPUT_FILE = "hackathons.json"
 SEARCH_QUERY = "upcoming hackathons"
@@ -38,7 +32,14 @@ EXCLUDED_SITES = ["devpost", "devfolio", "unstop", "hackerrank","hackerearth"]
 CUSTOM_SEARCH_URL = 'https://www.googleapis.com/customsearch/v1'
 CUSTOM_SEARCH_API_KEY = os.getenv('GOOGLE_API_KEY')
 CUSTOM_SEARCH_ID = os.getenv('SEARCH_ENGINE_ID')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 # EXCLUDED_SITES = []
+
+# Configure logging and API
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 class WebScraper:
     def __init__(self):
@@ -199,12 +200,15 @@ class WebScraper:
             "date": The end date of the event in "DD-MM-YYYY" format (if it's a date range, return the full range as "DD-MM-YYYY to DD-MM-YYYY").
             "link": The URL associated with the event (if available).
             "description": A brief description of the event, including its theme, objectives, or any other important details.
+            "type": remote or onsite
+            "category": AI,Web3,Software Development
+            "prize pool": list prizes(can be cash prize or intrnship offer of job offer etc.)
         
         Important guidelines:
         1. Keep the date in its original format - DO NOT try to parse or modify date ranges
         2. Only include events that are upcoming (i.e., events happening after {today_date.strftime('%d-%m-%Y')})
         3. Ensure that the event is a hackathon. Do not classify other types of events
-        4. If event details are unclear, mark them as null
+        4. If any of the details are unclear, mark them as null
         5. Return the response in this exact format:
         [
             {{
@@ -212,7 +216,10 @@ class WebScraper:
                 "name": "Example Hackathon",
                 "date": "01-02-2025 to 02-02-2025",
                 "link": "http://example.com",
-                "description": "Description here"
+                "description": "an innovation-driven hackathon where artificial intelligence meets creativity! This event brings together developers, data scientists, AI enthusiasts, and problem-solvers to build groundbreaking AI-powered solutions. Whether you're an AI expert or just starting your journey, HackAIthon provides the perfect platform to collaborate, learn, and push the boundaries of AI technology. ",
+                "type": Remote,
+                "category":AI,
+                "prize pool": $10000,
             }}
         ]
     
@@ -306,7 +313,13 @@ class WebScraper:
         except Exception as e:
             print(f"Error: {e}")'''
 
-        additional_info = {"link": None, "description": None}
+        additional_info = {
+            "link": None,
+            "description": None,
+            "type": None,
+            "category": None,
+            "prize pool": None
+        }
         
         try:
             '''# Step 1: Perform Google search
@@ -316,8 +329,8 @@ class WebScraper:
             time.sleep(1)
             
             # Step 2: Collect and scrape content from the first few search result links
-            results = driver.find_elements(By.TAG_NAME, "a")
-            candidate_contents = []'''
+            results = driver.find_elements(By.TAG_NAME, "a")'''
+            candidate_contents = []
             params = {
                     'q': search_query,
                     'key': CUSTOM_SEARCH_API_KEY,
@@ -349,6 +362,9 @@ class WebScraper:
                 Extract hackathon details from the provided content. Use the following JSON structure:
                 - "link": The URL of the event (if available).
                 - "description": A brief description of the event.
+                - "type": "remote" or "onsite" (if unclear, return null).
+                - "category": "AI", "Web3", or "Software Development" (if unclear, return null).
+                - "prize pool": A list of prizes (e.g., cash prizes, internships, job offers; if unclear, return null).
                 
                 Content:
                 {json.dumps(candidate_contents[:2])}  # Send only the first two contents for LLM evaluation
@@ -368,7 +384,10 @@ class WebScraper:
                     if isinstance(additional_details, dict):
                         additional_info.update({
                             "link": additional_details.get("link") or additional_info["link"],
-                            "description": additional_details.get("description") or additional_info["description"]
+                            "description": additional_details.get("description") or additional_info["description"],
+                            "type": additional_details.get("type"),
+                            "category": additional_details.get("category"),
+                            "prize pool": additional_details.get("prize pool")
                         })
                 except Exception as e:
                     logger.error(f"LLM processing error for {name}: {e}")
@@ -408,7 +427,10 @@ def main():
             additional_info = scraper.search_additional_info(hackathon["name"])
             hackathon.update({
                 "link": hackathon.get("link") or additional_info["link"],
-                "description": hackathon.get("description") or additional_info["description"]
+                "description": hackathon.get("description") or additional_info["description"],
+                "type": hackathon.get("type") or additional_info["type"],
+                "category": hackathon.get("category") or additional_info["category"],
+                "prize pool": hackathon.get("prize pool") or additional_info["prize pool"]
             })
 
         # Step 4: Save results
