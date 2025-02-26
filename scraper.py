@@ -91,6 +91,7 @@ class WebScraper:
                     'start': start_param,
                 }
 
+                print(CUSTOM_SEARCH_URL)
                 results = requests.get(CUSTOM_SEARCH_URL, params=params)
                 for item in results.json()['items']:
                     print(item['title'])
