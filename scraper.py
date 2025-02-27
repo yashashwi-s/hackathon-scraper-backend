@@ -40,7 +40,7 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 class WebScraper:
     def __init__(self):
         self.options = webdriver.ChromeOptions()
-        # self.options.add_argument('--headless')
+        self.options.add_argument('--headless')
         # self.service = Service(chromedrier_path)
 
     def google_search(self, max_results = MAX_RESULTS):
@@ -262,7 +262,6 @@ class WebScraper:
 
 def save_hackathons_to_mongo(hackathons: List[Dict]):
     client = MongoClient(os.getenv("MONGO_URI"))
-    print("MONGO_URI:", os.getenv("MONGO_URI"))
     db = client["hackathonDB"]
     if "hackathons" in db.list_collection_names():
         db.drop_collection("hackathons")
