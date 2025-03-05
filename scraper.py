@@ -64,15 +64,21 @@ class WebScraper:
                     'start': start_param,
                 }
 
-                print(CUSTOM_SEARCH_URL)
+                logger.info(f"Using custom search URL: {CUSTOM_SEARCH_URL}")
                 results = requests.get(CUSTOM_SEARCH_URL, params=params)
-                for item in results.json()['items']:
-                    print(item['title'])
-                results = results.json()['items']
+                response_json = results.json()
+                logger.info("DEBUG: Full API response: " + json.dumps(response_json))
                 
-                for result in results:
-                    href = result["link"]
-                    if href and href.startswith('http') and not 'google' in href:
+                if 'items' not in response_json:
+                    logger.error("API response did not contain 'items': " + json.dumps(response_json))
+                    break
+
+                items = response_json['items']
+                
+                for item in items:
+                    logger.info("Item title: " + item.get('title', ''))
+                    href = item.get("link")
+                    if href and href.startswith('http') and 'google' not in href:
                         if not any(excluded in href for excluded in EXCLUDED_SITES):
                             links.append(href)
                         else:
@@ -94,7 +100,7 @@ class WebScraper:
     def scrape_page(self, url):
         """Scrape webpage content using Selenium and BeautifulSoup to extract both text and links."""
         driver = webdriver.Chrome(options=self.options)
-        content = {"text": None, "links": [], "image_links" : []}
+        content = {"text": None, "links": [], "image_links": []}
         
         try:
             driver.get(url)
